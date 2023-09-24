@@ -1,0 +1,10 @@
+wd=$(pwd)/
+tag=Colitis_and_ICI
+ncores=6
+K=3
+A=2
+thr=2.5
+comb=4
+to_py=test_input/pmid-ICI_and_Colitis.txt
+etype='all'
+rscript=/home/usr/miniconda3/envs/R363/lib/R/bin/Rscript

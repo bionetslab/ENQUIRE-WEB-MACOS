@@ -1,0 +1,9 @@
+wd=$(pwd)/
+tag=check_mem
+ncores=6
+K=3
+A=2
+thr=2.5
+comb=4
+to_py=$(pwd)/input/pmid-ferroptosis_ImmuneSystem.txt
+etype='all'
