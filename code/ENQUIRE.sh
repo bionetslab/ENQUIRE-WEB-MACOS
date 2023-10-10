@@ -146,54 +146,55 @@ while getopts ":hp:i:t:j:c:r:a:k:w:f:e::" options;do
 	esac
 done
 
-### WARNING/ERROR HANDLING
+### WARNING/ERROR HANDLING ###
 
-if [[ -z "$wd" && -z "$config" ]]; then
+if [[ -n "$config" ]]; then
+	if [[ "$(grep -c "^[^\-\#]*=[^\-\#]*$\|^$" "$config")" -lt "$(grep -c ".*" "$config")" ]]; then
+		echo "ERROR: potentially malicious config file detected!"
+		echo "Only lines implying 'variable=value' are accepted!"
+		echo -e "Your Config file:\n\n$(cat "$config")\n"
+		Help
+		exit 1
+		### rscript required ###
+	else
+		echo -e "sourcing parameters from ${config}"
+		source "$config"
+		
+	fi
+fi
+
+if [[ -z "$wd" ]]; then
 	echo -e "Warning: missing working directory, ENQUIRE will use the current working directory"
 	wd=$(pwd)/
 fi
-if [[ -z "$rscript" && -z "$config" ]]; then
-	echo -e "Warning: Rscript unspecified, using $(which Rscript)"
+
+if [[ -z "$rscript" ]]; then
+	echo -e "Rscript path was not specified under the 'rscript' variable,\n set to environment-available R interpreter"
 	rscript=$(which Rscript)
+	echo "$rscript"
 fi
-if [[ -z "$to_py" && -z "$config" ]]; then
-	echo "Error: missing an input"
+
+# halting errors
+
+if [[ ! -f "$rscript" ]];then
+	echo "ERROR! Rscript path is unvalid:"
+	echo "$rscript"
+	Help
+	exit 1	
+elif [[ -z "$to_py" ]]; then
+	echo "Error: missing an input (required)"
 	Help
 	exit 1
-# elif [[ -z "$pw" ]]; then
-# 	echo "Error: password for PubMed database required"
-# 	Help
-# 	exit 1	
+elif [[ -z "$tag" ]]; then
+	echo "Error: missing a tag/job name (required)"
+	Help
+	exit 1
+### BLOCK ANY INPUT THAT IS SMALLER THAN 3 PAPERS ###
+elif [[ "$(wc -l < "$to_py")" -lt 3  ]]; then
+	echo "STOP: LESS THAN 3 ARTICLES HAVE BEEN PASSED"
+	echo "A minimum of 3 PMIDs is required, but a list of a few dozens entries is recommended"
+	exit 1
 else
-	if [[ -n "$config" ]]; then
-		if [[ "$(grep -cE -e "^[^-]+=[^-]+$|^$" < $config)" -lt "$(wc -l <$config)"  ]]; then
-			echo "ERROR: potentially malicious config file detected!"
-			echo "Only lines implying 'variable=value' are accepted!"
-			echo -e "Your Config file:\n\n$(cat "$config")\n"
-			Help
-			exit 1
-			### rscript required ###
-		else
-			echo -e "sourcing parameters from ${config}"
-			source "$config"
-			if [[ -z "$rscript" ]]; then
-				echo -e "Rscript path was not specified under the 'rscript' variable,\n set to environment-available R interpreter"
-				rscript=$(which Rscript)
-				echo "$rscript"
-			elif [[ ! -f "$rscript" ]];then
-				echo "ERROR! Rscript path is unvalid:"
-				echo "$rscript"
-				Help
-				exit 1
-			fi	
-		fi
-	fi
-	### BLOCK ANY INPUT THAT IS SMALLER THAN 3 PAPERS ###
-	if [[ "$(wc -l < "$to_py")" -lt 3  ]]; then
-		echo "STOP: LESS THAN 3 ARTICLES HAVE BEEN PASSED"
-		echo "A minimum of 3 PMIDs is required, but a list of a few dozens entries is recommended"
-		exit 1
-	fi
 	echo "the script will run"
 	echo
 	tmp="${wd}tmp-${tag}"
@@ -217,7 +218,7 @@ else
 	rm -rf "${tmp}/efetch_inputs"
 	mkdir -p "${tmp}/efetch_inputs"
 	cp -f "$to_py" "${tmp}/efetch_inputs"
-	to_py=$(\ls "${tmp}/efetch_inputs/")
+	to_py="$(basename $to_py)"
 	#
 	touch "${tmp}/previous_iteration.txt"
 	# check if an expansion has already happened, hence update tag #
@@ -231,17 +232,18 @@ else
 		i=$(($(find "${tmp}/" -maxdepth 1 -type d | wc -l)-2)) # -2 because of "." and "efetch inputs"
 		it=$i
 	fi
+	### DEFAULT VALUES ###
 	if [[ -z "$comb" ]];then
 		comb=4
-		echo "default: $comb entities out of a motifs pairs will generate an esearch query"
+		echo "default: ${comb} entities out of a motifs pairs will generate an esearch query"
 	fi
 	if [[ -z "$thr" ]];then
 		thr=1
-		echo "default: no representativeness threshold set"	
+		echo "default: representativeness threshold set to $thr"	
 	fi
 	if [[ -z "$A" ]];then
 		A=2
-		echo "default: 1 attempt per pair of subgraphs will be performed"	
+		echo "default: ${A} attempt per pair of subgraphs will be performed"	
 	fi
 	if [[ -z "$etype" ]];then
 		etype='all'
@@ -254,6 +256,10 @@ else
 	if [[ -z "$ncores" ]];then
 		ncores=6
 		echo "default: ${ncores} cores will be used"	
+	fi
+	if [[ -z "$K" ]];then
+		K=3
+		echo "default: connectivity requirement set to ${K} communities"	
 	fi
 	#echo "number of iterations set to $iter"
 	# status.log controls number of iterations
@@ -269,7 +275,7 @@ else
 	#ulimit -s 33554432
 	### SAVE INPUT PARAMETERS! ###
 	echo "Save Parameters in ad hoc file"
-	echo -e "wd=${wd}\ntag=${tag}\nncores=${ncores}\nK=${K}\nA=${A}\nthr=${thr}\ncomb=${comb}\nto_py=${to_py}\netype=${etype}\nrscript=${rscript}" > "${tmp}/ENQUIRE_input_parameters.txt"
+	echo -e "wd=${wd}\ntag=${tag}\nncores=${ncores}\nK=${K}\nA=${A}\nthr=${thr}\ncomb=${comb}\nto_py=${input}\netype=${etype}\nrscript=${rscript}" > "${tmp}/ENQUIRE_input_parameters.txt"
 	echo
 	###
 	while  [[ "$(wc -w < "${tmp}/${tag}/status.log")" -lt 1 ]];
